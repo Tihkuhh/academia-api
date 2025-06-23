@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas.aluno import AlunoCreate, AlunoResponse
-from app.models.models import Aluno
-from app.database.connection import SessionLocal
+from app.database.connection import SessionLocal, get_db
+from app.schemas.aluno import CheckinCreate, CheckinResponse
+import joblib
+import os
+import pika
+import json
+from app.models.models import Aluno, Checkin
+from datetime import datetime, timezone
+
 
 router = APIRouter()
 
@@ -25,20 +32,16 @@ def criar_aluno(aluno: AlunoCreate, db: Session = Depends(get_db)):
     db.refresh(novo_aluno)
     return novo_aluno
 
-from app.models.models import Checkin
-from app.schemas.aluno import CheckinCreate, CheckinResponse
-
-@router.post("/aluno/checkin", response_model=CheckinResponse)
+@router.post("/aluno/checkin")
 def registrar_checkin(checkin: CheckinCreate, db: Session = Depends(get_db)):
     aluno = db.query(Aluno).filter(Aluno.id == checkin.aluno_id).first()
     if not aluno:
         raise HTTPException(status_code=404, detail="Aluno não encontrado")
 
-    novo_checkin = Checkin(aluno_id=checkin.aluno_id)
-    db.add(novo_checkin)
-    db.commit()
-    db.refresh(novo_checkin)
-    return novo_checkin
+    publicar_checkin_fila(checkin.aluno_id)
+
+    return {"mensagem": "Check-in enviado para processamento."}
+
 
 @router.get("/aluno/{id}/frequencia", response_model=list[CheckinResponse])
 def listar_checkins(id: int, db: Session = Depends(get_db)):
@@ -48,16 +51,7 @@ def listar_checkins(id: int, db: Session = Depends(get_db)):
 
     return aluno.checkins
 
-import joblib
-import os
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.database.connection import SessionLocal
-from app.models.models import Aluno, Checkin
-from app.schemas.aluno import CheckinResponse
-from app.database.connection import get_db  
 
-router = APIRouter()
 
 # Carrega o modelo só uma vez, quando o módulo é importado
 model_path = os.path.join(os.path.dirname(__file__), "../../ml/churn_model.pkl")
@@ -114,3 +108,18 @@ def obter_risco_churn(id: int, db: Session = Depends(get_db)):
         "nome": aluno.nome,
         "probabilidade_churn": probabilidade_churn
     }
+def publicar_checkin_fila(aluno_id: int):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+    channel = connection.channel()
+    channel.queue_declare(queue='checkins', durable=True)
+
+    mensagem = json.dumps({'aluno_id': aluno_id})
+    channel.basic_publish(
+        exchange='',
+        routing_key='checkins',
+        body=mensagem,
+        properties=pika.BasicProperties(
+            delivery_mode=2,  # mensagem persistente
+        )
+    )
+    connection.close()

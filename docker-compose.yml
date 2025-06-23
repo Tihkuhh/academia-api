@@ -14,7 +14,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: app/Dockerfile
+      dockerfile: Dockerfile
     container_name: academia_api
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
@@ -25,6 +25,25 @@ services:
       - db
     env_file:
       - .env
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"      # Porta para conexão RabbitMQ
+      - "15672:15672"    # Porta da interface web (dashboard)
+
+  checkin_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "sleep 60 && python -u app/workers/checkin_worker.py"
+    depends_on:
+      - rabbitmq
+      - db
+    volumes:
+      - .:/code
+    working_dir: /code
 
 volumes:
   pgdata:
