@@ -1,28 +1,31 @@
 from pydantic import BaseModel, EmailStr
+from datetime import datetime
 
-class AlunoCreate(BaseModel):
+class AlunoBase(BaseModel):
     nome: str
     email: EmailStr
-    plano: str
+    plano_id: int
 
-class AlunoResponse(BaseModel):
+
+class AlunoCreate(AlunoBase):
+    pass
+
+class AlunoResponse(AlunoBase):
     id: int
-    nome: str
-    email: EmailStr
-    plano: str
-
+    
     class Config:
         orm_mode = True
 
-from datetime import datetime
-
-class CheckinCreate(BaseModel):
+class CheckinBase(BaseModel):
     aluno_id: int
 
-class CheckinResponse(BaseModel):
+class CheckinCreate(CheckinBase):
+    pass
+
+class CheckinResponse(CheckinBase):
     id: int
-    aluno_id: int
     data_hora: datetime
-
+    duracao: int | None
+    
     class Config:
         orm_mode = True

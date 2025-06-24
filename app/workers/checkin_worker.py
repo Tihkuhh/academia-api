@@ -1,5 +1,6 @@
 import pika
 import json
+import time  # 🆕 necessário para o retry
 from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
 from app.models.models import Checkin
@@ -8,7 +9,11 @@ from datetime import datetime, timezone
 def salvar_checkin(aluno_id: int):
     db: Session = SessionLocal()
     try:
-        novo_checkin = Checkin(aluno_id=aluno_id, data_hora=datetime.now(timezone.utc))
+        # Usar UTC explicitamente
+        novo_checkin = Checkin(
+            aluno_id=aluno_id, 
+            data_hora=datetime.now(timezone.utc)
+        )
         db.add(novo_checkin)
         db.commit()
     except Exception as e:
@@ -23,8 +28,24 @@ def callback(ch, method, properties, body):
     salvar_checkin(aluno_id)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
+# 🆕 Adicionado para tentar conectar várias vezes ao RabbitMQ
+def wait_for_rabbitmq():
+    MAX_RETRIES = 5
+    RETRY_DELAY = 5  # segundos
+
+    for i in range(MAX_RETRIES):
+        try:
+            print(f"🐇 Tentando conectar ao RabbitMQ... tentativa {i+1}")
+            connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+            print("✅ Conectado ao RabbitMQ.")
+            return connection
+        except pika.exceptions.AMQPConnectionError:
+            print(f"❌ Conexão falhou, tentando novamente em {RETRY_DELAY} segundos...")
+            time.sleep(RETRY_DELAY)
+    raise Exception("❌ Não foi possível conectar ao RabbitMQ após várias tentativas.")
+
 def main():
-    connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+    connection = wait_for_rabbitmq()  # 🆕 uso da função com retry
     channel = connection.channel()
     channel.queue_declare(queue='checkins', durable=True)
     channel.basic_qos(prefetch_count=1)

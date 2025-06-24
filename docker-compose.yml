@@ -1,49 +1,109 @@
 services:
+  api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: academia_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/academia
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    command: >
+      sh -c "while ! nc -z rabbitmq 5672; do sleep 1; done &&
+             while ! pg_isready -h db -p 5432 -U postgres; do sleep 1; done &&
+             python app/initdb.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  checkin_worker:
+    build: .
+    container_name: academia_checkin_worker
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/academia
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    command: >
+      sh -c "while ! nc -z rabbitmq 5672; do sleep 1; done &&
+             python app/workers/checkin_worker.py"
+
+  report_worker:
+    build: .
+    container_name: academia_report_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/academia
+    volumes:
+      - ./reports:/app/reports
+    command: >
+      sh -c "while ! pg_isready -h db -p 5432 -U postgres; do sleep 1; done &&
+             python app/workers/report_worker.py"
+
+  retrain_worker:
+    build: .
+    container_name: academia_retrain_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/academia
+    volumes:
+      - ./ml:/app/ml
+    command: >
+      sh -c "while ! pg_isready -h db -p 5432 -U postgres; do sleep 1; done &&
+             python app/workers/retrain_model.py"
+
   db:
     image: postgres:15
     container_name: academia_db
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: academia
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: academia_api
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/code
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-    env_file:
-      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: academia_rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"      # Porta para conexão RabbitMQ
-      - "15672:15672"    # Porta da interface web (dashboard)
-
-  checkin_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: >
-      sh -c "sleep 60 && python -u app/workers/checkin_worker.py"
-    depends_on:
-      - rabbitmq
-      - db
-    volumes:
-      - .:/code
-    working_dir: /code
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:
+  reports:
+  ml:

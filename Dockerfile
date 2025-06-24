@@ -1,19 +1,21 @@
-# Usa uma imagem leve com Python
 FROM python:3.11-slim
 
-# Define o diretório de trabalho
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    netcat-openbsd \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copia os arquivos
-COPY . .
+COPY requirements.txt .
 
-# Instala as dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expõe a porta padrão da API
+COPY . .
+
 EXPOSE 8000
+ENV PYTHONPATH=/app
 
-ENV PYTHONPATH=/code
-
-# Comando para iniciar o servidor
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# O comando de execução real será sobrescrito pelo docker-compose.yml
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000"]
