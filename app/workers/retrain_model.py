@@ -1,6 +1,3 @@
-# app/workers/retrain_model.py
-# (Seu código, com a correção abaixo)
-
 import os
 import joblib
 import pandas as pd
@@ -46,8 +43,6 @@ def extract_features(aluno, db):
     
     churn = 1 if dias_desde_ultimo > 30 else 0
     
-    # print(f"Aluno ID {aluno.id}: ...") # Log opcional
-    
     return {
         'aluno_id': aluno.id,
         'checkins_ultima_semana': checkins_ultima_semana,
@@ -75,8 +70,6 @@ def train_model():
             print("⚠️ Nenhum dado disponível para treinamento.")
             return
         
-        # --- CORREÇÃO AQUI ---
-        # A verificação deve ser no DataFrame, antes de criar X e y
         if len(df) < 5:
             print(f"⚠️ Apenas {len(df)} registros. Dados insuficientes para divisão treino/teste.")
             return
@@ -85,7 +78,6 @@ def train_model():
         if len(unique_classes) < 2:
             print(f"⚠️ Apenas uma classe presente nos dados: {unique_classes}. Não é possível treinar.")
             return
-        # --- FIM DA CORREÇÃO ---
         
         X = df[['checkins_ultima_semana', 'dias_desde_ultimo', 'duracao_media', 'tipo_plano']]
         y = df['churn']

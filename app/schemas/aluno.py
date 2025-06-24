@@ -14,7 +14,7 @@ class AlunoResponse(AlunoBase):
     id: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class CheckinBase(BaseModel):
     aluno_id: int

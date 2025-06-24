@@ -15,10 +15,10 @@ def init_db():
     try:
         # Criar planos padrão
         print("📦 Inserindo planos padrão...")
-        planos_data = [
-            {"nome": "mensal", "descricao": "Plano mensal", "preco": 12000, "duracao_dias": 30},
-            {"nome": "anual", "descricao": "Plano anual", "preco": 100000, "duracao_dias": 365}
-        ]
+        planos_data = planos_data = [
+    {"nome": "mensal"},
+    {"nome": "anual"}
+]
         
         planos_objs = []
         for plano_data in planos_data:

@@ -1,12 +1,12 @@
+import joblib
+import os
+import pika
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from app.schemas.aluno import AlunoCreate, AlunoResponse
 from app.database.connection import SessionLocal, get_db
 from app.schemas.aluno import CheckinCreate, CheckinResponse
-import joblib
-import os
-import pika
-import json
 from app.models.models import Aluno, Checkin, Plano
 from datetime import datetime, timezone, timedelta
 

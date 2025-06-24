@@ -1,4 +1,4 @@
-# app/models/models.py (atualizado)
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from app.database.connection import Base
 from sqlalchemy.orm import relationship
@@ -15,7 +15,6 @@ class Aluno(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
-    # Campos existentes:
     plano_id = Column(Integer, ForeignKey("planos.id"), nullable=False)
     plano = relationship("Plano", back_populates="alunos")
     checkins = relationship("Checkin", back_populates="aluno", cascade="all, delete")
